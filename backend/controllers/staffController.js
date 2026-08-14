@@ -1,4 +1,4 @@
-const Staff = require("../models/staffModel");
+const Staff = require("../models/StaffModel");
 const cloudinary = require("cloudinary").v2;
 const bcrypt = require("bcryptjs"); 
 const Department = require("../models/Department")

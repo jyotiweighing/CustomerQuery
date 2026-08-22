@@ -479,16 +479,16 @@ export default function Performance() {
       </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {!stats ? (
-          Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
             <StatCard label="Total Assigned" value={stats.total} icon={ListChecks} tone="brand" />
             <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} tone="emerald" />
             <StatCard label="Pending" value={stats.pending} icon={Clock3} tone="amber" />
             <StatCard label="Success Rate" value={`${stats.successRate}%`} icon={Percent} tone="brand" trend="+2%" />
-            <StatCard label="Rating" value={staff?.rating || '5.0'} icon={Star} tone="amber" />
+            {/* <StatCard label="Rating" value={staff?.rating || '5.0'} icon={Star} tone="amber" /> */}
           </>
         )}
       </div>

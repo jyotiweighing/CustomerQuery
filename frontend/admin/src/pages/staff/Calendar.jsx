@@ -1,3 +1,5 @@
+
+
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock, AlertCircle, CheckCircle2, FileText, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
 import Layout from '../../components/staff/Layout';
@@ -38,15 +40,24 @@ const formatDateKey = (dateString) => {
 export default function CalendarPage() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cursor, setCursor] = useState(new Date(2026, 6, 1)); // July 2026
+ const [cursor, setCursor] = useState(new Date());
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const tasksPerPage = 2;
 
-  const staffId = "6a50dc2dd834a03a0f954187"; 
+  // LocalStorage se logged-in staff ki ID dynamic nikalne ke liye
+  const userData = localStorage.getItem("user");
+  const parsedUser = userData ? JSON.parse(userData) : null;
+  const staffId = parsedUser?._id;
 
   useEffect(() => {
+    // Agar staffId available nahi hai toh API call na karein
+    if (!staffId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     fetchTasks(staffId)
       .then((res) => {
@@ -142,7 +153,7 @@ export default function CalendarPage() {
         
         <div className="grid h-full grid-cols-2 gap-5 lg:grid-cols-[1fr_380px] items-stretch">
           
-          {/* Main Glass Calendar Card (Stretched to fill bottom) */}
+          {/* Main Glass Calendar Card */}
           <div className="flex flex-col justify-between overflow-hidden backdrop-blur-xl bg-white/70 dark:bg-slate-900/70 p-5 rounded-3xl border border-white/50 dark:border-slate-800/80 shadow-2xl shadow-blue-500/5 h-full">
             
             {/* Header Controls */}
@@ -181,7 +192,7 @@ export default function CalendarPage() {
               ))}
             </div>
 
-            {/* Calendar Grid - Stretches perfectly to fill bottom space */}
+            {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-2 flex-1 my-1">
               {days.map((day, idx) => {
                 const dayEvents = eventsFor(day);
@@ -258,7 +269,6 @@ export default function CalendarPage() {
                         key={task._id} 
                         className="group relative rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-3.5 bg-white/60 dark:bg-slate-800/50 backdrop-blur-md shadow-sm hover:border-blue-400/60 transition-all duration-300"
                       >
-                        {/* Gradient Border Accent Strip */}
                         <div className={`absolute top-0 left-4 right-4 h-1 rounded-b-full ${palette.bg}`} />
 
                         <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -300,7 +310,6 @@ export default function CalendarPage() {
                           </span>
                         </div>
 
-                        {/* Glass Dates Footer */}
                         <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/50 grid grid-cols-2 gap-1 text-[11px]">
                           <div className="flex items-center gap-1.5">
                             <div className="p-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600">
@@ -330,7 +339,7 @@ export default function CalendarPage() {
               )}
             </div>
 
-            {/* Pagination Controls Fixed at Bottom */}
+            {/* Pagination Controls */}
             {!loading && sortedTasks.length > tasksPerPage && (
               <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between shrink-0">
                 <button

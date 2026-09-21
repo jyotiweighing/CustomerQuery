@@ -29,8 +29,6 @@ exports.addDepartment = async (req, res) => {
         message: 'Please provide a department name',
       });
     }
-
-    // Check if department already exists
     const existingDept = await Department.findOne({ name: name.trim() });
     if (existingDept) {
       return res.status(400).json({

@@ -9,11 +9,6 @@ import {
   mockReports,
 } from '../data/mockData';
 
-// ---------------------------------------------------------------------------
-// Axios instance — point baseURL at the real backend when it's ready.
-// Every function below is written as if it hits a real endpoint, so swapping
-// the mock implementation for `return api.get('/tasks')` etc. is a 1-line change.
-// ---------------------------------------------------------------------------
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 15000,

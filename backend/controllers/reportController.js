@@ -533,11 +533,19 @@ exports.getDashboardStats = async (req, res) => {
         task.taskId ||
         task.ticketId ||
         `TK-${task._id.toString().slice(-6).toUpperCase()}`,
-      title: task.title,
-      partyName: task.partyDetails?.partyName || "N/A",
+      sourceQueryId: task.sourceQueryId || null,
+      sourceQueryCode: task.sourceQueryCode || "",
+      title: task.title || "",
+      partyName: task.partyDetails?.partyName || task.partyDetails?.contactPerson || "N/A",
+      partyDetails: task.partyDetails || {},
       department: task.assignedStaff?.department || "General",
-      status: task.status,
+      assignedStaff: task.assignedStaff || null,
+      status: task.status || "Pending",
+      softwareDetails: task.softwareDetails || "",
+      softwareType: task.softwareType || "",
+      material: task.material || [],
       createdAt: task.createdAt,
+      priority: task.priority || "Medium"
     }));
 
     return res.status(200).json({

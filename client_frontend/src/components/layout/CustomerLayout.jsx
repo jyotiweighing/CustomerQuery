@@ -1,0 +1,2 @@
+import {useState} from 'react';import {Outlet} from 'react-router-dom';import Sidebar from './Sidebar';import Topbar from './Topbar';
+export default function CustomerLayout(){const[open,setOpen]=useState(false);return <div className="flex min-h-screen bg-slate-50"><Sidebar open={open} onClose={()=>setOpen(false)}/><div className="min-w-0 flex-1"><Topbar onMenuClick={()=>setOpen(true)}/><main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><Outlet/></main></div></div>}

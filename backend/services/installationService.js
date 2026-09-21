@@ -278,6 +278,8 @@ exports.createInstallation = async (data) => {
     title: `Installation - ${installation.partyName}`,
     softwareDetails: installation.softwareDetails,
     softwareType: installation.softwareType,
+    softwareFeature: installation.softwareFeature || [],
+    material: installation.material || [],
     description: installation.softwareDetails,
     priority: data.priority,
     status: installation.status,
@@ -511,6 +513,8 @@ exports.updateInstallation = async (id, updateData) => {
     task.partyDetails = buildPartyDetails(updated);
     task.softwareDetails = updated.softwareDetails;
     task.softwareType = updated.softwareType;
+    task.softwareFeature = updated.softwareFeature || [];
+    task.material = updated.material || [];
     task.description = updated.softwareDetails;
     task.title = `Installation - ${updated.partyName}`;
     
@@ -556,6 +560,7 @@ exports.updateInstallation = async (id, updateData) => {
         title: `Installation - ${updated.partyName}`,
         softwareDetails: updated.softwareDetails,
         softwareType: updated.softwareType,
+        softwareFeature: updated.softwareFeature || [],
         description: updated.softwareDetails,
         priority: "High",
         status: "Pending",

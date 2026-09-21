@@ -26,7 +26,43 @@ const taskSchema = new mongoose.Schema(
     },
     softwareDetails: String,
     softwareType: String,
+    softwareFeature: {
+      type: [String],
+      enum: ["Email", "SMS", "Cloud", "Whatsapp"],
+      default: [],
+    },
+    material: [
+      {
+        name: {
+          type: String,
+          enum: [
+          "IP Camera",
+  "Traffic Light",
+  "ANPR Camera",
+  "Vehicle Position Sensor (VPS)",
+  "VHF Reader",
+  "VHF Tag",
+   "Boom Barrier",
+    "I/O Controller",
+  "Pole",
+  "Computer",
+  "Printer"
+          ],
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          min: 1,
+          default: 1,
+        },
+      },
+    ],
     description: String,
+
+    sourceType: { type: String, enum: ["CustomerQuery", "Installation", "Manual"], default: "Manual" },
+    sourceQueryId: { type: mongoose.Schema.Types.ObjectId, ref: "Query", default: null },
+    sourceQueryCode: { type: String, default: "" },
+    preferredContact: { type: String, enum: ["Call", "Email", "Chat", ""], default: "" },
 
     priority: {
       type: String,
@@ -36,7 +72,7 @@ const taskSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Pending", "In Progress", "Completed"],
+      enum: ["Pending", "In Progress", "Completed", "Resolved"],
       default: "Pending",
     },
 
@@ -77,6 +113,7 @@ const taskSchema = new mongoose.Schema(
       phone: String,
       designation: String,
       department: String,
+      role: String,
     },
 
     partyDetails: {

@@ -770,6 +770,13 @@ exports.updateTaskStatus = async (req, res) => {
       }
     }
 
+    // Keep the linked customer query status in sync with task progress.
+    if (task.sourceType === "CustomerQuery" && task.sourceQueryId) {
+      const Query = require("../models/Query");
+      const queryStatus = status === "Pending" ? "Assigned" : status === "Completed" || status === "Resolved" ? "Resolved" : "In Progress";
+      await Query.findByIdAndUpdate(task.sourceQueryId, { status: queryStatus });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Status and progress updated successfully",

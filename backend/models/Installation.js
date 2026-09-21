@@ -1,5 +1,27 @@
 // const mongoose = require("mongoose");
 
+const SOFTWARE_TYPES = [
+  "Standard Software",
+  "Photo Capturing",
+  "Master Slave",
+  "Unmaned Software",
+];
+
+const SOFTWARE_FEATURES = ["Email", "SMS", "Cloud", "Whatsapp"];
+const MATERIAL_OPTIONS = [
+  "IP Camera",
+  "Traffic Light",
+  "ANPR Camera",
+  "Vehicle Position Sensor (VPS)",
+  "VHF Reader",
+  "VHF Tag",
+   "Boom Barrier",
+    "I/O Controller",
+  "Pole",
+  "Computer",
+  "Printer",
+];
+
 // const installationSchema = new mongoose.Schema(
 //   {
 //     poNumber: { type: String, required: true, trim: true },
@@ -46,18 +68,18 @@ const mongoose = require("mongoose");
 
 const installationSchema = new mongoose.Schema(
   {
-    poNumber: { 
-      type: String, 
-      required: true, 
-      trim: true, 
-      unique: true 
+    poNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      unique: true,
     },
-    billNumber: { 
-      type: String, 
-      required: false, 
-      trim: true, 
-      unique: true, 
-      sparse: true 
+    billNumber: {
+      type: String,
+      required: false,
+      trim: true,
+      unique: true,
+      sparse: true,
     },
     billDate: { type: Date },
     partyName: { type: String, required: true, trim: true },
@@ -73,9 +95,45 @@ const installationSchema = new mongoose.Schema(
     softwareDetails: { type: String },
     softwareType: {
       type: String,
-      enum: ["Desktop", "Web App", "Cloud ERP"],
-      default: "Desktop",
+      enum: SOFTWARE_TYPES,
+      default: "Standard Software",
     },
+    softwareFeature: {
+      type: [String],
+      enum: SOFTWARE_FEATURES,
+      default: [],
+    },
+    // material: {
+    //   type: [String],
+    //   enum: MATERIAL_OPTIONS,
+    //   default: [],
+    // },
+    material: [
+      {
+        name: {
+          type: String,
+          enum: [
+            "IP Camera",
+            "Traffic",
+            "AWPR Count",
+            "Vehicle Position Server (VPS)",
+            "UHF Radar",
+            "VHF Tag",
+                        "I/O Controller",
+            "Pole",
+            "Computer",
+            "Printer",
+          ],
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+          default: 1,
+        },
+      },
+    ],
     assignedStaff: {
       staffId: { type: String },
       fullName: String,
@@ -111,16 +169,16 @@ module.exports = mongoose.model("Installation", installationSchema);
 
 // const installationSchema = new mongoose.Schema(
 //   {
-//     poNumber: { 
-//       type: String, 
-//       required: true, 
-//       trim: true, 
+//     poNumber: {
+//       type: String,
+//       required: true,
+//       trim: true,
 //       unique: true // Unique Constraint Added
 //     },
-//     billNumber: { 
-//       type: String, 
-//       required: false, 
-//       trim: true, 
+//     billNumber: {
+//       type: String,
+//       required: false,
+//       trim: true,
 //       unique: true, // Unique Constraint Added
 //       sparse: true  // Multiple 'null' / 'undefined' documents ke conflicts rokne ke liye
 //     },

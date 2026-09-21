@@ -1,0 +1,2 @@
+const map={Open:'bg-blue-50 text-blue-700 border-blue-100',Picked:'bg-violet-50 text-violet-700 border-violet-100','In Progress':'bg-amber-50 text-amber-700 border-amber-100',Resolved:'bg-emerald-50 text-emerald-700 border-emerald-100',Closed:'bg-slate-100 text-slate-600 border-slate-200'};
+export default function StatusBadge({status}){return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${map[status]||map.Open}`}>{status}</span>}

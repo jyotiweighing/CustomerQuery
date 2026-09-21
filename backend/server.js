@@ -19,7 +19,9 @@ app.use('/api/staff', require('./routes/staffRoutes'));
 app.use('/api/install', require('./routes/installationRoutes'));
 app.use('/api/task', require('./routes/task.routes'));
 app.use('/api/notification', require('./routes/notificationRoutes'));
-app.use('/api/report', require('./routes/reportRoutes'))
+app.use('/api/report', require('./routes/reportRoutes'));
+app.use('/api/customers', require('./routes/customerRoutes'));
+app.use('/api/queries', require('./routes/queryRoutes'))
 
 const PORT=process.env.PORT || 5000;
 

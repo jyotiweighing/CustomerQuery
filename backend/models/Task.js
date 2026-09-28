@@ -36,17 +36,9 @@ const taskSchema = new mongoose.Schema(
         name: {
           type: String,
           enum: [
-          "IP Camera",
-  "Traffic Light",
-  "ANPR Camera",
-  "Vehicle Position Sensor (VPS)",
-  "VHF Reader",
-  "VHF Tag",
-   "Boom Barrier",
-    "I/O Controller",
-  "Pole",
-  "Computer",
-  "Printer"
+          "IP Camera", "Traffic Light", "ANPR Camera",
+          "Vehicle Position Sensor (VPS)", "VHF Reader", "VHF Tag",
+          "Boom Barrier", "I/O Controller", "Pole", "Computer", "Printer"
           ],
           required: true,
         },
@@ -62,7 +54,7 @@ const taskSchema = new mongoose.Schema(
     sourceType: { type: String, enum: ["CustomerQuery", "Installation", "Manual"], default: "Manual" },
     sourceQueryId: { type: mongoose.Schema.Types.ObjectId, ref: "Query", default: null },
     sourceQueryCode: { type: String, default: "" },
-    preferredContact: { type: String, enum: ["Call", "Email", "Chat", ""], default: "" },
+    preferredContact: { type: String, enum: ["Call", "Email", ""], default: "" },
 
     priority: {
       type: String,

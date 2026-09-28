@@ -3,6 +3,7 @@ const controller = require("../controllers/queryController");
 const auth = require("../middleware/auth.middleware");
 
 router.post("/", auth, controller.createQuery);
+router.post("/admin-create", auth, controller.createAdminQuery);
 router.get("/my", auth, controller.getMyQueries);
 router.get("/", auth, controller.getAllQueries);
 router.get("/:id", auth, controller.getQueryById);

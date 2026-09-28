@@ -22,7 +22,8 @@ const querySchema = new mongoose.Schema(
       customerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Customer",
-        required: true,
+        required: false,
+        default: null,
       },
       customerCode: String,
       name: String,
@@ -101,7 +102,7 @@ const querySchema = new mongoose.Schema(
     description: { type: String, required: true },
     preferredContact: {
       type: String,
-      enum: ["Call", "Email", "Chat"],
+      enum: ["Call", "Email"],
       required: true,
     },
     partyDetails: {
@@ -112,14 +113,15 @@ const querySchema = new mongoose.Schema(
       address: { type: String, default: "" },
       location: { type: String, default: "" },
       contactPerson: { type: String, required: true },
-      mobileNo: { type: String, required: true },
-      email: { type: String, required: true, lowercase: true, trim: true },
+      mobileNo: { type: String, default: "" },
+      email: { type: String, default: "", lowercase: true, trim: true },
     },
     status: {
       type: String,
       enum: ["Open", "Assigned", "Picked", "In Progress", "Resolved", "Closed"],
       default: "Open",
     },
+    dueDate: { type: Date, default: null },
     pickedBy: {
       userId: String,
       name: String,

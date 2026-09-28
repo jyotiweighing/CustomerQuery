@@ -26,6 +26,9 @@ import {
   User,
   AlertCircle,
   FolderX,
+  X,
+  Download,
+  ArrowUpDown,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -135,7 +138,56 @@ export default function DynamicReports() {
     setSelectedStaff("ALL");
   };
 
-  const hasDataAvailable = data.taskList && data.taskList.length > 0;
+  const [recordTab, setRecordTab] = useState("All");
+  const [recordSort, setRecordSort] = useState("newest");
+  const [recordDate, setRecordDate] = useState("");
+  const [recordStaff, setRecordStaff] = useState("ALL");
+  const [recordPage, setRecordPage] = useState(1);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const RECORDS_PER_PAGE = 10;
+
+  const filteredRecords = useMemo(() => {
+    let rows = [...(data.taskList || [])];
+    if (recordTab !== "All") rows = rows.filter(t => (t.sourceType || (t.installationId ? "Installation" : "CustomerQuery")) === recordTab);
+    if (recordDate) rows = rows.filter(t => t.createdAt && new Date(t.createdAt).toISOString().slice(0, 10) === recordDate);
+    if (recordStaff !== "ALL") rows = rows.filter(t => t.assignedStaffName === recordStaff);
+    rows.sort((a,b) => { const ad = new Date(a.createdAt || 0).getTime(); const bd = new Date(b.createdAt || 0).getTime(); return recordSort === "newest" ? bd-ad : ad-bd; });
+    return rows;
+  }, [data.taskList, recordTab, recordDate, recordStaff, recordSort]);
+
+  useEffect(() => setRecordPage(1), [recordTab, recordDate, recordStaff, recordSort]);
+  const recordPages = Math.max(1, Math.ceil(filteredRecords.length / RECORDS_PER_PAGE));
+  const visibleRecords = filteredRecords.slice((recordPage - 1) * RECORDS_PER_PAGE, recordPage * RECORDS_PER_PAGE);
+  const hasDataAvailable = filteredRecords.length > 0;
+
+  const downloadSingleExcel = (t) => {
+    const wb = XLSX.utils.book_new();
+    const rows = [{
+      "Task ID": t.taskId, "Title": t.title || "", "Type": t.sourceType || "", "Assigned Staff": t.assignedStaffName || "Unassigned",
+      "Department": t.assignedStaffDept || "", "Client / Party": t.clientName || "", "Contact Person": t.partyDetails?.contactPerson || "", "Contact Mobile": t.partyDetails?.mobileNo || "", "Contact Email": t.partyDetails?.email || "", "Alternate No": t.partyDetails?.alternateNo || "", "Address": t.partyDetails?.address || "", "Location": t.partyDetails?.location || "",
+      "Software / Type": t.softwareDetails || "", "Installation": t.installationDate ? new Date(t.installationDate).toLocaleDateString("en-IN") : (t.sourceType === "Installation" && t.dueDate ? t.dueDate : ""), "Software Type": t.softwareType || "", "Software Features": (t.softwareFeature || []).join(", "), "Material & Quantity": (t.material || []).map(m => `${m.name} x ${m.quantity || 1}`).join(", "),
+      "Preferred Contact": t.preferredContact || "", "Description": t.description || "", "Sales Person": t.partyDetails?.salesPersonName || "", "PO Number": t.poNumber || "", "Bill Number": t.billNumber || "", "Bill Date": t.billDate ? new Date(t.billDate).toLocaleDateString("en-IN") : "", "Assigned Date": t.assignedDate || "", "Due Date": t.dueDate || "", "Progress Date": t.progressDate || "", "Progress (%)": Number(t.progress || 0), "Status": t.status || "", "Priority": t.priority || ""
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Task Details");
+    XLSX.writeFile(wb, `${t.taskId || "task"}.xlsx`);
+  };
+
+  const downloadSinglePDF = (t) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18); doc.text("Task Details", 14, 18);
+    doc.setFontSize(10);
+    const body = [
+      ["Task ID", t.taskId], ["Title", t.title || "—"], ["Type", t.sourceType || "—"], ["Assigned Staff", t.assignedStaffName || "Unassigned"], ["Department", t.assignedStaffDept || "—"],
+      ["Client / Party", t.clientName || "—"], ["Contact Person", t.partyDetails?.contactPerson || "—"], ["Mobile", t.partyDetails?.mobileNo || "—"], ["Email", t.partyDetails?.email || "—"], ["Alternate No", t.partyDetails?.alternateNo || "—"],
+      ["Address", t.partyDetails?.address || "—"], ["Location", t.partyDetails?.location || "—"], ["Software / Type", t.softwareDetails || "—"], ["Installation", t.installationDate ? new Date(t.installationDate).toLocaleDateString("en-IN") : (t.sourceType === "Installation" && t.dueDate ? t.dueDate : "—")], ["Software Type", t.softwareType || "—"],
+      ["Software Features", (t.softwareFeature || []).join(", ") || "—"], ["Material & Quantity", (t.material || []).map(m => `${m.name} x ${m.quantity || 1}`).join(", ") || "—"],
+      ["Preferred Contact", t.preferredContact || "—"], ["Sales Person", t.partyDetails?.salesPersonName || "—"], ["PO Number", t.poNumber || "—"], ["Bill Number", t.billNumber || "—"],
+      ["Bill Date", t.billDate ? new Date(t.billDate).toLocaleDateString("en-IN") : "—"], ["Assigned Date", t.assignedDate || "—"], ["Due Date", t.dueDate || "—"], ["Progress Date", t.progressDate || "—"], ["Progress", `${Number(t.progress || 0)}%`],
+      ["Status", t.status || "—"], ["Priority", t.priority || "—"], ["Description", t.description || "—"],
+    ];
+    autoTable(doc, { startY: 28, head: [["Field", "Value"]], body, styles: { fontSize: 9, cellPadding: 3 }, headStyles: { fillColor: [43,82,245] } });
+    doc.save(`${t.taskId || "task"}.pdf`);
+  };
 
   // --- EXCEL DOWNLOAD (Includes Staff Summary Table at Bottom) ---
   const handleDownloadExcel = () => {
@@ -150,19 +202,34 @@ export default function DynamicReports() {
     const excelData = data.taskList.map((t, idx) => ({
       "S.No": idx + 1,
       "Task ID": t.taskId,
+      "Title": t.title || "",
+      "Type": t.sourceType || "",
       "Assigned Staff": t.assignedStaffName || "N/A",
       Department: t.assignedStaffDept || "General",
-      "Client Name": t.clientName,
-      "Software Type": t.softwareType,
-      Installtion: t.softwareDetails,
-      "Assigned Date": t.assignedDate,
-      "Due Date": t.dueDate,
-      "Progress Date": t.progressDate,
-      "Bill No": t.billNumber,
-      "Bill Date": t.billDate,
-      "Po Number": t.poNumber,
-      Status: t.status,
-      Priority: t.priority,
+      "Client / Party": t.clientName || "",
+      "Contact Person": t.partyDetails?.contactPerson || "",
+      Mobile: t.partyDetails?.mobileNo || "",
+      Email: t.partyDetails?.email || "",
+      "Alternate No": t.partyDetails?.alternateNo || "",
+      Address: t.partyDetails?.address || "",
+      Location: t.partyDetails?.location || "",
+      "Software / Type": t.softwareDetails || "",
+      "Installation": t.installationDate ? new Date(t.installationDate).toLocaleDateString("en-IN") : (t.sourceType === "Installation" && t.dueDate ? t.dueDate : ""),
+      "Software Type": t.softwareType || "",
+      "Software Features": (t.softwareFeature || []).join(", "),
+      "Material & Quantity": (t.material || []).map(m => `${m.name} x ${m.quantity || 1}`).join(", "),
+      "Preferred Contact": t.preferredContact || "",
+      "Description": t.description || "",
+      "PO Number": t.poNumber || "",
+      "Bill Number": t.billNumber || "",
+      "Bill Date": t.billDate || "",
+      "Sales Person": t.partyDetails?.salesPersonName || "",
+      "Assigned Date": t.assignedDate || "",
+      "Due Date": t.dueDate || "",
+      "Progress Date": t.progressDate || "",
+      "Progress (%)": Number(t.progress || 0),
+      Status: t.status || "",
+      Priority: t.priority || "",
     }));
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Task Report");
@@ -485,6 +552,8 @@ export default function DynamicReports() {
     t.assignedStaffName || "N/A",
     t.clientName || "N/A",
     t.softwareType || "N/A",
+    (t.softwareFeature || []).join(", ") || "N/A",
+    (t.material || []).map(m => `${m.name} x ${m.quantity || 1}`).join(", ") || "N/A",
     t.softwareDetails || "N/A",
     formatDate(t.billDate),
     t.billNumber || "N/A",
@@ -503,6 +572,8 @@ export default function DynamicReports() {
         "Staff Name",
         "Client / Party",
         "Software",
+        "Software Features",
+        "Material & Quantity",
         "Installation",
         "Bill Date",
         "Bill No",
@@ -1036,80 +1107,97 @@ export default function DynamicReports() {
         </div>
       </div>
 
-      {/* Detailed Tasks Table */}
+      {/* Recent + Detailed Task Records */}
       <div className={`${cardStyle} p-6`}>
-        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-          <h3 className="font-bold text-slate-800 text-base">
-            Detailed Task Records
-          </h3>
-          <span className="text-xs font-bold px-3 py-1 bg-blue-50 text-[#2B52F5] rounded-lg">
-            Total: {taskList?.length || 0}
-          </span>
+        <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><h3 className="font-bold text-slate-800 text-base">Recent Task Records</h3><p className="text-xs text-slate-500">Latest tasks appear first.</p></div>
+          <div className="flex flex-wrap gap-2">
+            {["All","Installation","CustomerQuery"].map(tab => <button key={tab} onClick={()=>setRecordTab(tab)} className={`rounded-xl px-3 py-2 text-xs font-bold ${recordTab===tab?'bg-[#2B52F5] text-white':'bg-slate-100 text-slate-600'}`}>{tab === "CustomerQuery" ? "Queries" : tab}</button>)}
+          </div>
+        </div>
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <select value={recordSort} onChange={e=>setRecordSort(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select>
+          <input type="date" value={recordDate} onChange={e=>setRecordDate(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"/>
+          <select value={recordStaff} onChange={e=>setRecordStaff(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"><option value="ALL">All assigned partners</option>{(data.masterStaffList || []).map(st=><option key={st._id || st.staffId} value={st.name}>{st.name}</option>)}</select>
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">Showing {visibleRecords.length} / {filteredRecords.length}</div>
+          <button onClick={()=>{setRecordDate("");setRecordStaff("ALL");setRecordSort("newest");setRecordTab("All")}} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Reset filters</button>
         </div>
 
-        {!hasDataAvailable ? (
-          <RenderNoData />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
-                  <th className="p-3">Task ID</th>
-                  <th className="p-3">Assigned Staff</th>
-                  <th className="p-3">Department</th>
-                  <th className="p-3">Client / Party</th>
-                  <th className="p-3">Software / Type</th>
-                  <th className="p-3">Installation</th>
-                  <th className="p-3">Assigned Date</th>
-                  <th className="p-3">Due Date</th>
-                  <th className="p-3">Progress Date</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Priority</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                {taskList.map((t, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="p-3 font-bold text-[#2B52F5]">{t.taskId}</td>
-                    <td className="p-3 font-semibold text-slate-900">
-                      {t.assignedStaffName}
-                    </td>
-                    <td className="p-3 capitalize text-slate-500">
-                      {t.assignedStaffDept}
-                    </td>
-                    <td className="p-3 font-semibold text-slate-800">
-                      {t.clientName}
-                    </td>
-                    <td className="p-3">{t.softwareType}</td>
-                    <td className="p-3">{t.softwareDetails}</td>
-                    <td className="p-3">{t.assignedDate}</td>
-                    <td className="p-3">{t.dueDate}</td>
-
-                    <td className="p-3">{t.progressDate || t.assignedDate}</td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          t.status === "Completed"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : t.status === "Pending"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-blue-100 text-blue-800"
-                        }`}
-                      >
-                        {t.status}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-red-500">{t.priority}</td>
+        <div className="mb-6 overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <table className="w-full min-w-[1900px] text-left">
+              <thead><tr className="border-b bg-slate-50 text-[10px] uppercase font-bold tracking-wide text-slate-700">
+                <th className="p-3">Task ID</th>
+                <th className="p-3">Assigned Staff</th>
+                <th className="p-3">Department</th>
+                <th className="p-3">Client / Party</th>
+                {recordTab !== "CustomerQuery" && <th className="p-3">Software / Type</th>}
+                {recordTab !== "CustomerQuery" && <th className="p-3">Installation</th>}
+                <th className="p-3">Assigned Date</th>
+                <th className="p-3">Due Date</th>
+                <th className="p-3">Progress Date</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Priority</th>
+                <th className="p-3">Software Features</th>
+                <th className="p-3">Software Type</th>
+                <th className="p-3">Material &amp; Quantity</th>
+              </tr></thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {hasDataAvailable ? visibleRecords.map((t, idx) => (
+                  <tr key={t.taskId || idx} onClick={() => setSelectedTask(t)} className="cursor-pointer align-top hover:bg-blue-50/50">
+                    <td className="p-3 font-bold text-[#2B52F5]">{t.taskId || "—"}</td>
+                    <td className="p-3 font-semibold">{t.assignedStaffName || "Unassigned"}</td>
+                    <td className="p-3">{t.assignedStaffDept || "—"}</td>
+                    <td className="p-3 font-semibold">{t.clientName || "—"}</td>
+                    {recordTab !== "CustomerQuery" && <td className="max-w-[240px] p-3">{t.softwareDetails || "—"}</td>}
+                    {recordTab !== "CustomerQuery" && <td className="p-3">{t.installationDate ? new Date(t.installationDate).toLocaleDateString("en-IN") : (t.sourceType === "Installation" && t.dueDate ? t.dueDate : "—")}</td>}
+                    <td className="p-3">{t.assignedDate || "—"}</td>
+                    <td className="p-3">{t.dueDate || "—"}</td>
+                    <td className="p-3">{t.progressDate || "—"}</td>
+                    <td className="p-3">{t.status || "—"}</td>
+                    <td className="p-3">{t.priority || "—"}</td>
+                    <td className="max-w-[260px] p-3">{(t.softwareFeature || []).join(", ") || "—"}</td>
+                    <td className="p-3 font-semibold">{t.softwareType || "—"}</td>
+                    <td className="max-w-[300px] p-3">{(t.material || []).map((m) => `${m.name} × ${m.quantity || 1}`).join(", ") || "—"}</td>
                   </tr>
-                ))}
+                )) : <tr><td colSpan={recordTab === "CustomerQuery" ? 12 : 14} className="p-10 text-center text-slate-400">No records match the selected filters.</td></tr>}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <span className="text-xs font-semibold text-slate-500">Page {recordPage} of {recordPages}</span>
+          <div className="flex gap-2"><button disabled={recordPage<=1} onClick={()=>setRecordPage(p=>Math.max(1,p-1))} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-40">Previous</button>{Array.from({length: Math.min(recordPages,5)},(_,i)=>{const page=Math.min(recordPages,Math.max(1,recordPage-2)+i);return <button key={page} onClick={()=>setRecordPage(page)} className={`rounded-lg px-3 py-2 text-xs font-bold ${page===recordPage?'bg-[#2B52F5] text-white':'border'}`}>{page}</button>})}<button disabled={recordPage>=recordPages} onClick={()=>setRecordPage(p=>Math.min(recordPages,p+1))} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-40">Next</button></div>
+        </div>
       </div>
+
+      {selectedTask && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" onClick={()=>setSelectedTask(null)}>
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white shadow-2xl" onClick={e=>e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-4"><div><h3 className="text-lg font-bold text-slate-900">{selectedTask.taskId}</h3><p className="text-xs text-slate-500">{selectedTask.sourceType === "CustomerQuery" ? "Customer Query Task" : "Installation Task"}</p></div><div className="flex items-center gap-2"><button onClick={()=>downloadSinglePDF(selectedTask)} className="rounded-xl border px-3 py-2 text-xs font-bold"><Download size={14} className="mr-1 inline"/>PDF</button><button onClick={()=>downloadSingleExcel(selectedTask)} className="rounded-xl border px-3 py-2 text-xs font-bold"><FileSpreadsheet size={14} className="mr-1 inline"/>Excel</button><button onClick={()=>setSelectedTask(null)} className="rounded-xl p-2 hover:bg-slate-100"><X size={19}/></button></div></div>
+            <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ["Task ID", selectedTask.taskId], ["Title", selectedTask.title],
+                ["Type", selectedTask.sourceType === "CustomerQuery" ? "Query" : selectedTask.sourceType === "Installation" ? "Installation" : "Manual"],
+                ["Source Query", selectedTask.sourceQueryCode || selectedTask.sourceQueryId], ["Installation ID", selectedTask.installationId], ["Installation", selectedTask.installationDate ? new Date(selectedTask.installationDate).toLocaleDateString("en-IN") : (selectedTask.sourceType === "Installation" && selectedTask.dueDate ? selectedTask.dueDate : "—")],
+                ["Assigned Staff", selectedTask.assignedStaffName], ["Department", selectedTask.assignedStaffDept], ["Client / Party", selectedTask.clientName],
+                ["Contact Person", selectedTask.partyDetails?.contactPerson], ["Contact Mobile", selectedTask.partyDetails?.mobileNo], ["Contact Email", selectedTask.partyDetails?.email],
+                ["Alternate No", selectedTask.partyDetails?.alternateNo], ["Address", selectedTask.partyDetails?.address], ["Location", selectedTask.partyDetails?.location],
+                ["Software / Type", selectedTask.softwareDetails],
+                ["Software Type", selectedTask.softwareType], ["Software Details", selectedTask.softwareDetails], ["Preferred Contact", selectedTask.preferredContact],
+                ["Sales Person", selectedTask.partyDetails?.salesPersonName], ["PO Number", selectedTask.poNumber], ["Bill Number", selectedTask.billNumber],
+                ["Bill Date", selectedTask.billDate ? new Date(selectedTask.billDate).toLocaleDateString("en-IN") : ""], ["Assigned Date", selectedTask.assignedDate], ["Due Date", selectedTask.dueDate], ["Progress Date", selectedTask.progressDate],
+                ["Status", selectedTask.status], ["Priority", selectedTask.priority], ["Progress", `${Number(selectedTask.progress || 0)}%`],
+              ].map(([k, v]) => <div key={k} className="rounded-2xl bg-slate-50 p-4"><div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{k}</div><div className="mt-1 break-words text-sm font-bold text-slate-800">{v || "—"}</div></div>)}
+              <div className="rounded-2xl bg-blue-50 p-4 sm:col-span-2 lg:col-span-3"><div className="text-[10px] font-bold uppercase text-blue-500">Software Features</div><div className="mt-2 flex flex-wrap gap-2">{(selectedTask.softwareFeature || []).length ? selectedTask.softwareFeature.map(x=><span key={x} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">{x}</span>) : <span className="text-xs text-slate-400">None</span>}</div></div>
+              <div className="rounded-2xl bg-amber-50 p-4 sm:col-span-2 lg:col-span-3"><div className="text-[10px] font-bold uppercase text-amber-600">Material & Quantity</div><div className="mt-2 flex flex-wrap gap-2">{(selectedTask.material || []).length ? selectedTask.material.map((m,i)=><span key={`${m.name}-${i}`} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-700">{m.name} × {m.quantity || 1}</span>) : <span className="text-xs text-slate-400">None</span>}</div></div>
+              <div className="rounded-2xl border p-4 sm:col-span-2 lg:col-span-3"><div className="text-[10px] font-bold uppercase text-slate-400">Description</div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{selectedTask.description || "—"}</p></div>
+              <div className="rounded-2xl border p-4 sm:col-span-2 lg:col-span-3"><div className="text-[10px] font-bold uppercase text-slate-400">Remarks</div><div className="mt-2 space-y-2">{(selectedTask.remarks || []).length ? selectedTask.remarks.map((r, i) => <div key={r._id || i} className="rounded-xl bg-slate-50 p-3 text-sm"><div className="font-bold text-slate-700">{r.author || "Staff"}</div><div className="mt-1 whitespace-pre-wrap text-slate-600">{r.text || "—"}</div></div>) : <span className="text-xs text-slate-400">No remarks</span>}</div></div>
+              <div className="rounded-2xl border p-4 sm:col-span-2 lg:col-span-3"><div className="text-[10px] font-bold uppercase text-slate-400">Uploaded Files</div><div className="mt-2 flex flex-wrap gap-2">{(selectedTask.files || []).length ? selectedTask.files.map((f, i) => <a key={f.publicId || i} href={f.fileUrl} target="_blank" rel="noreferrer" className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">{f.label || f.fileType || `File ${i + 1}`}</a>) : <span className="text-xs text-slate-400">No files</span>}</div></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

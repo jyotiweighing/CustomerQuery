@@ -9,12 +9,13 @@ const findQuery = (id) => mongoose.isValidObjectId(id)
   ? Query.findOne({ $or: [{ _id: id }, { queryId: id }] })
   : Query.findOne({ queryId: id });
 
-const buildTaskFromQuery = async ({ query, assignee, assigneeRole, assignedBy }) => {
+const buildTaskFromQuery = async ({ query, assignee, assigneeRole, assignedBy, dueDate }) => {
   const existingTask = await Task.findOne({ sourceQueryId: query._id });
   if (existingTask) return existingTask;
 
   return Task.create({
     title: query.subject,
+    dueDate: dueDate || undefined,
     description: query.description,
     softwareType: query.softwareType || "",
     softwareFeature: Array.isArray(query.softwareFeature) ? query.softwareFeature : [],
@@ -56,15 +57,16 @@ exports.createQuery = async (req, res) => {
       product,
       softwareType = "",
       softwareFeature = [],
-      material = [],
       priority,
       description,
       preferredContact,
       partyDetails = {},
     } = req.body;
-    if (!subject || !category || !description || !preferredContact || !partyDetails.partyName || !partyDetails.contactPerson || !partyDetails.mobileNo || !partyDetails.email) {
+    if (!subject || !category || !description || !["Call", "Email"].includes(preferredContact) || !partyDetails.partyName || !partyDetails.contactPerson) {
       return res.status(400).json({ success: false, message: "Required query and party/contact fields are missing" });
     }
+    if (preferredContact === "Call" && !partyDetails.mobileNo) return res.status(400).json({ success: false, message: "Mobile number is required when Call is selected" });
+    if (preferredContact === "Email" && !partyDetails.email) return res.status(400).json({ success: false, message: "Email is required when Email is selected" });
 
     const query = await Query.create({
       customer: {
@@ -80,7 +82,6 @@ exports.createQuery = async (req, res) => {
       product,
       softwareType,
       softwareFeature: Array.isArray(softwareFeature) ? softwareFeature : [],
-      material: Array.isArray(material) ? material : [],
       priority,
       description,
       preferredContact,
@@ -90,6 +91,124 @@ exports.createQuery = async (req, res) => {
     return res.status(201).json({ success: true, message: "Query created successfully", data: query });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createAdminQuery = async (req, res) => {
+  try {
+    if (String(req.user?.role || "").toLowerCase() !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only Admin can create a query from admin panel",
+      });
+    }
+
+    const {
+      customerName = "",
+      customerCode = "",
+      companyName = "",
+      subject,
+      category,
+      product = "",
+      softwareType = "",
+      softwareFeature = [],
+      material = [],
+      priority = "Medium",
+      description,
+      preferredContact,
+      partyDetails = {},
+    } = req.body;
+
+    if (!customerName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer name is required",
+      });
+    }
+
+    if (!subject?.trim() || !category?.trim() || !description?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Subject, category and description are required",
+      });
+    }
+
+    if (!["Call", "Email"].includes(preferredContact)) {
+      return res.status(400).json({
+        success: false,
+        message: "Preferred contact must be Call or Email",
+      });
+    }
+
+    const contact = {
+      poNumber: partyDetails.poNumber || "",
+      billNumber: partyDetails.billNumber || "",
+      billDate: partyDetails.billDate || null,
+      partyName: partyDetails.partyName || companyName || customerName,
+      address: partyDetails.address || "",
+      location: partyDetails.location || "",
+      contactPerson: partyDetails.contactPerson || customerName,
+      mobileNo: partyDetails.mobileNo || "",
+      email: partyDetails.email || "",
+      alternateNo: partyDetails.alternateNo || "",
+      salesPersonName: partyDetails.salesPersonName || "",
+    };
+
+    if (preferredContact === "Call" && !contact.mobileNo?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number is required when Call is selected",
+      });
+    }
+
+    if (preferredContact === "Email" && !contact.email?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required when Email is selected",
+      });
+    }
+
+    const cleanMaterial = Array.isArray(material)
+      ? material
+          .filter((item) => item?.name)
+          .map((item) => ({
+            name: String(item.name).trim(),
+            quantity: Math.max(1, Number(item.quantity) || 1),
+          }))
+      : [];
+
+    const query = await Query.create({
+      // Admin-created queries do not require a registered Customer record.
+      customer: {
+        customerId: null,
+        customerCode: customerCode || "",
+        name: customerName.trim(),
+        email: contact.email || "",
+        mobile: contact.mobileNo || "",
+        companyName: companyName || "",
+      },
+      subject: subject.trim(),
+      category: category.trim(),
+      product,
+      softwareType,
+      softwareFeature: Array.isArray(softwareFeature) ? softwareFeature : [],
+      material: cleanMaterial,
+      priority,
+      description: description.trim(),
+      preferredContact,
+      partyDetails: contact,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Customer query created successfully",
+      data: query,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -152,7 +271,10 @@ exports.assignQueryToStaff = async (req, res) => {
       return res.status(403).json({ success: false, message: "Only Admin can assign a customer query to staff" });
     }
 
-    const { staffId } = req.body;
+    const { staffId, dueDate } = req.body;
+    if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(Date.parse(dueDate))) {
+      return res.status(400).json({ success: false, message: "Valid due date is required" });
+    }
     if (!staffId || !mongoose.isValidObjectId(staffId)) {
       return res.status(400).json({ success: false, message: "Valid staffId is required" });
     }
@@ -183,8 +305,9 @@ exports.assignQueryToStaff = async (req, res) => {
       assignedAt: new Date(),
     };
 
-    const task = await buildTaskFromQuery({ query, assignee: staff, assigneeRole: "staff", assignedBy });
+    const task = await buildTaskFromQuery({ query, assignee: staff, assigneeRole: "staff", assignedBy, dueDate });
 
+    query.dueDate = new Date(`${dueDate}T12:00:00.000Z`);
     query.status = "Assigned";
     query.pickedBy = {
       userId: String(staff._id),

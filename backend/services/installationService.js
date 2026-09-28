@@ -39,114 +39,71 @@ function buildPartyDetails(installation) {
 // assigned yet. If a staff member is picked later (via edit), the task
 // gets an assignedStaff attached — see updateInstallation below.
 // ---------------------------------------------------------------------
-// exports.createInstallation = async (data) => {
-//   const installation = await Installation.create(data);
-
-//   const taskId = await generateTaskId();
-//   const taskPayload = {
-//     taskId,
-//     title: `Installation - ${installation.partyName}`,
-//     softwareDetails: installation.softwareDetails,
-//     softwareType: installation.softwareType,
-//     description: installation.softwareDetails,
-//     priority: data.priority,
-//     status: installation.status,
-//     dueDate: installation.installationDate || undefined,
-//     installationId: installation._id.toString(),
-//     partyDetails: buildPartyDetails(installation),
-//   };
-
-//   if (data.assignedStaff?.staffId) {
-//     const staff = await Staff.findById(data.assignedStaff.staffId).populate(
-//       "department",
-//       "name",
-//     );
-//     if (staff) {
-//       taskPayload.assignedStaff = buildStaffSnapshot(staff);
-//       staff.assignedQueries += 1;
-//       await staff.save();
-//     }
-//   }
-
-//   const newTask = await Task.create(taskPayload);
-
-//   if (taskPayload.assignedStaff) {
-//     await Notification.create({
-//       staffId: taskPayload.assignedStaff.staffId,
-//       taskId: newTask._id.toString(),
-//       title: "New Task Assigned",
-//       message: `You have been assigned a new installation task for ${installation.partyName}.`,
-//       type: "assigned",
-//       read: false,
-//     });
-//   }
-
-//   return installation;
-// };
 exports.createInstallation = async (data) => {
-  // 1. Unique Check for poNumber and billNumber
-  if (data.poNumber) {
-    const existingPO = await Installation.findOne({ poNumber: data.poNumber.trim() });
-    if (existingPO) {
-      throw new Error(`PO Number '${data.poNumber}' already exists.`);
-    }
-  }
-
-  if (data.billNumber) {
-    const existingBill = await Installation.findOne({ billNumber: data.billNumber.trim() });
-    if (existingBill) {
-      throw new Error(`Bill Number '${data.billNumber}' already exists.`);
-    }
-  }
-
-  // 2. Create Installation
-  const installation = await Installation.create(data);
-
-  const taskId = await generateTaskId();
-  const taskPayload = {
-    taskId,
-    title: `Installation - ${installation.partyName}`,
-    softwareDetails: installation.softwareDetails,
-    softwareType: installation.softwareType,
-    softwareFeature: installation.softwareFeature || [],
-    material: installation.material || [],
-    description: installation.softwareDetails,
-    priority: data.priority,
-    status: installation.status,
-    dueDate: installation.installationDate || undefined,
-    installationId: installation._id.toString(),
-    partyDetails: buildPartyDetails(installation),
-  };
-
-  // 3. Handle Assigned Staff
-  if (data.assignedStaff?.staffId) {
-    const staff = await Staff.findById(data.assignedStaff.staffId).populate(
-      "department",
-      "name"
-    );
-    if (staff) {
-      taskPayload.assignedStaff = buildStaffSnapshot(staff);
-      staff.assignedQueries += 1;
-      await staff.save();
-    }
-  }
-
-  // 4. Create Task
-  const newTask = await Task.create(taskPayload);
-
-  // 5. Create Notification
-  if (taskPayload.assignedStaff) {
-    await Notification.create({
-      staffId: taskPayload.assignedStaff.staffId,
-      taskId: newTask._id.toString(),
-      title: "New Task Assigned",
-      message: `You have been assigned a new installation task for ${installation.partyName}.`,
-      type: "assigned",
-      read: false,
+  let installation = null;
+  let newTask = null;
+  let assignedStaff = null;
+  let staffIncremented = false;
+  try {
+    const clean = { ...data };
+    ["billNumber", "billDate", "installationDate", "salesPersonName"].forEach((key) => {
+      if (clean[key] === "" || clean[key] === undefined) delete clean[key];
     });
-  }
+    if (clean.amount === "" || clean.amount === undefined) delete clean.amount;
 
-  return installation;
+    if (!clean.poNumber?.trim()) throw new Error("PO Number is required.");
+    if (!clean.partyName?.trim()) throw new Error("Party Name is required.");
+    if (!clean.mobileNo?.trim()) throw new Error("Mobile Number is required.");
+
+    if (await Installation.exists({ poNumber: clean.poNumber.trim() })) {
+      throw new Error(`PO Number '${clean.poNumber}' already exists.`);
+    }
+    if (clean.billNumber && await Installation.exists({ billNumber: clean.billNumber.trim() })) {
+      throw new Error(`Bill Number '${clean.billNumber}' already exists.`);
+    }
+
+    if (clean.assignedStaff?.staffId) {
+      assignedStaff = await Staff.findById(clean.assignedStaff.staffId).populate("department", "name");
+      if (!assignedStaff) throw new Error("Selected staff member was not found.");
+      if (assignedStaff.status && assignedStaff.status !== "Active") throw new Error("Selected staff member is not active.");
+    }
+
+    installation = await Installation.create(clean);
+    const taskId = await generateTaskId();
+    const taskPayload = {
+      taskId, title: `Installation - ${installation.partyName}`,
+      softwareDetails: installation.softwareDetails || "", softwareType: installation.softwareType || "",
+      softwareFeature: installation.softwareFeature || [], material: installation.material || [],
+      description: installation.softwareDetails || `Installation - ${installation.partyName}`,
+      priority: installation.priority || "Medium", sourceType: "Installation", status: installation.status || "Pending",
+      dueDate: installation.installationDate || undefined, installationId: installation._id.toString(),
+      partyDetails: buildPartyDetails(installation),
+      statusHistory: [{ status: installation.status || "Pending", note: "Installation task created" }],
+    };
+    if (assignedStaff) taskPayload.assignedStaff = buildStaffSnapshot(assignedStaff);
+
+    newTask = await Task.create(taskPayload);
+
+    if (assignedStaff) {
+      assignedStaff.assignedQueries = (assignedStaff.assignedQueries || 0) + 1;
+      await assignedStaff.save();
+      staffIncremented = true;
+      await Notification.create({
+        staffId: assignedStaff._id.toString(), taskId: newTask._id.toString(),
+        title: "New Task Assigned", message: `You have been assigned a new installation task for ${installation.partyName}.`,
+        type: "assigned", read: false,
+      });
+    }
+    return installation;
+  } catch (error) {
+    // Compensating rollback: never leave an installation without its task.
+    try { if (newTask?._id) await Task.deleteOne({ _id: newTask._id }); } catch (rollbackError) { console.error("Task rollback failed:", rollbackError); }
+    try { if (installation?._id) await Installation.deleteOne({ _id: installation._id }); } catch (rollbackError) { console.error("Installation rollback failed:", rollbackError); }
+    if (staffIncremented && assignedStaff) {
+      try { await Staff.updateOne({ _id: assignedStaff._id }, { $inc: { assignedQueries: -1 } }); } catch (rollbackError) { console.error("Staff counter rollback failed:", rollbackError); }
+    }
+    throw error;
+  }
 };
 
 function sanitizeUpdateData(updateData) {
@@ -346,6 +303,8 @@ exports.updateInstallation = async (id, updateData) => {
     task.softwareFeature = updated.softwareFeature || [];
     task.material = updated.material || [];
     task.description = updated.softwareDetails;
+    task.priority = updated.priority || task.priority || "Medium";
+    task.sourceType = "Installation";
     task.title = `Installation - ${updated.partyName}`;
     
     if (validDueDate) {
@@ -392,7 +351,8 @@ exports.updateInstallation = async (id, updateData) => {
         softwareType: updated.softwareType,
         softwareFeature: updated.softwareFeature || [],
         description: updated.softwareDetails,
-        priority: "High",
+        priority: updated.priority || "Medium",
+        sourceType: "Installation",
         status: "Pending",
         dueDate: validDueDate,
         installationId: id,

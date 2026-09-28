@@ -11,6 +11,7 @@ export default function AssignStaffModal({ open, query, onClose, onAssigned }) {
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState("");
   const [search, setSearch] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -49,11 +50,12 @@ export default function AssignStaffModal({ open, query, onClose, onAssigned }) {
 
   const handleAssign = async (member) => {
     if (!query) return;
+    if (!dueDate) { setError("Please select a due date before assigning staff."); return; }
     try {
       setAssigning(member._id);
       setError("");
       const id = query.queryId || query._id;
-      const result = await assignCustomerQueryToStaff(id, member._id);
+      const result = await assignCustomerQueryToStaff(id, member._id, dueDate);
       onAssigned?.(result?.data || result);
     } catch (err) {
       setError(err?.response?.data?.message || "Unable to assign this query");
@@ -102,6 +104,7 @@ export default function AssignStaffModal({ open, query, onClose, onAssigned }) {
             </div>
 
             <div className="p-6">
+              <label className="mb-4 block text-sm font-semibold text-slate-700">Task Due Date *<input type="date" required value={dueDate} min={new Date().toLocaleDateString("en-CA")} onChange={(e) => setDueDate(e.target.value)} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500" /></label>
               <div className="relative mb-4">
                 <Search
                   size={16}

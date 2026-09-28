@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.5) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgb(148 163 184 / 0.5); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+html { scroll-behavior: smooth; }
+
+/* Always Force Light Mode Background */
+body {
+  background-color: #f8fafc !important; /* Light Slate Background */
+  color: #0f172a !important;            /* Dark Slate Text */
+
+}
+
+@layer components {
+  /* Glass card - signature surface */
+  .glass-card {
+    @apply relative rounded-2xl border border-white/60 bg-white/80 backdrop-blur-xl shadow-lg;
+  }
+
+  .glass-panel {
+    @apply relative rounded-2xl border border-slate-200/70 bg-white shadow-md;
+  }
+
+  /* Primary Button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700
+    px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200
+    hover:from-indigo-700 hover:to-indigo-800 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white
+    px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200
+    hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98];
+  }
+
+  /* Ghost Button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600
+    transition-colors duration-150 hover:bg-slate-100;
+  }
+
+  /* Danger Button */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-semibold
+    text-rose-600 transition-all duration-200 hover:bg-rose-100 active:scale-[0.98];
+  }
+
+  /* Form Input Field */
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800
+    placeholder:text-slate-400 shadow-sm transition-all duration-150
+    focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100;
+  }
+
+  /* Form Label Text */
+  .label-text {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+
+  /* Skeleton Loading */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-slate-200/70;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    background-size: 400px 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+}

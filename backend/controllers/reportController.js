@@ -1,4 +1,5 @@
 const Task = require("../models/Task");
+const Installation = require("../models/Installation");
 const Department = require("../models/Department");
 const Staff = require("../models/StaffModel");
 const User = require("../models/StaffModel");
@@ -259,6 +260,29 @@ exports.getReportsAnalytics = async (req, res) => {
     // 4. Fetch Tasks Data
     const rawTasks = await Task.find(taskFilter).sort({ createdAt: -1 }).lean();
 
+    // Installations are also reportable records. Older installations may exist
+    // without a linked Task document, so fetch them separately and add them
+    // to the report as Installation records. Linked installations are not
+    // duplicated because their installationId is already present on a Task.
+    const installationFilter = {};
+    if (fromDate || toDate) {
+      installationFilter.createdAt = {};
+      if (fromDate) {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+        installationFilter.createdAt.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        installationFilter.createdAt.$lte = end;
+      }
+    }
+    const rawInstallations = await Installation.find(installationFilter).sort({ createdAt: -1 }).lean();
+    const linkedInstallationIds = new Set(
+      rawTasks.map((t) => String(t.installationId || "")).filter(Boolean)
+    );
+
     // 5. Map Tasks to include Staff Name & Department Name & StatusHistory Date
     const formattedTaskList = rawTasks.map((t) => {
       let staffName = "Unassigned";
@@ -334,10 +358,70 @@ exports.getReportsAnalytics = async (req, res) => {
       };
     });
 
+    // Add older/unlinked installations so the Installation report tab is never
+    // empty merely because its task was not created or was created before the
+    // sourceType/installationId fields were introduced.
+    const unlinkedInstallationRows = rawInstallations
+      .filter((installation) => !linkedInstallationIds.has(String(installation._id)))
+      .map((installation) => {
+        const staff = installation.assignedStaff || {};
+        const staffName = staff.fullName || staff.name || (staff.email ? staff.email.split("@")[0] : "Unassigned");
+        const staffDept = staff.department?.name || staff.department || "General";
+        return {
+          _id: String(installation._id),
+          taskMongoId: String(installation._id),
+          sourceType: "Installation",
+          sourceQueryId: "",
+          sourceQueryCode: "",
+          taskId: `TSK-${String(installation._id).slice(-4).toUpperCase()}`,
+          title: `Installation - ${installation.partyName || "Installation"}`,
+          createdAt: installation.createdAt,
+          clientName: installation.partyName || installation.contactPerson || "N/A",
+          softwareType: installation.softwareType || "General",
+          softwareDetails: installation.softwareDetails || "",
+          softwareFeature: installation.softwareFeature || [],
+          material: installation.material || [],
+          installationDate: installation.installationDate || null,
+          description: installation.softwareDetails || `Installation - ${installation.partyName || ""}`,
+          preferredContact: "",
+          partyDetails: {
+            poNumber: installation.poNumber || "",
+            billNumber: installation.billNumber || "",
+            billDate: installation.billDate || null,
+            partyName: installation.partyName || "",
+            address: installation.address || "",
+            location: installation.location || "",
+            contactPerson: installation.contactPerson || "",
+            mobileNo: installation.mobileNo || "",
+            alternateNo: installation.alternateNo || "",
+            email: installation.email || "",
+            salesPersonName: installation.salesPersonName || "",
+          },
+          assignedStaff: staff,
+          progress: installation.status === "Completed" ? 100 : installation.status === "In Progress" ? 10 : 0,
+          remarks: [],
+          files: [],
+          installationId: String(installation._id),
+          assignedStaffName: staffName,
+          assignedStaffDept: staffDept,
+          assignedDate: installation.createdAt ? new Date(installation.createdAt).toLocaleDateString("en-GB") : "-",
+          dueDate: installation.installationDate ? new Date(installation.installationDate).toLocaleDateString("en-GB") : "-",
+          billNumber: installation.billNumber || "",
+          poNumber: installation.poNumber || "",
+          billDate: installation.billDate || null,
+          progressDate: installation.updatedAt ? new Date(installation.updatedAt).toLocaleDateString("en-GB") : "-",
+          status: installation.status || "Pending",
+          priority: installation.priority || "Medium",
+        };
+      });
+
+    const allReportRows = [...formattedTaskList, ...unlinkedInstallationRows]
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
     // Filter by Department if department filter is active
     const finalTaskList = (department && department !== "All")
-      ? formattedTaskList.filter((t) => t.assignedStaffDept.toLowerCase() === department.toLowerCase())
-      : formattedTaskList;
+      ? allReportRows.filter((t) => t.assignedStaffDept.toLowerCase() === department.toLowerCase())
+      : allReportRows;
 
     // Filter Master Staff list according to selected department
     const filteredMasterStaff = (department && department !== "All")
